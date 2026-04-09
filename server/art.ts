@@ -119,11 +119,11 @@ export const HAT_ART: Record<Hat, string> = {
 // ─── Rarity ANSI colors ────────────────────────────────────────────────────
 
 const RARITY_COLOR: Record<Rarity, string> = {
-  common:    "\x1b[90m",   // gray
-  uncommon:  "\x1b[32m",   // green
-  rare:      "\x1b[34m",   // blue
-  epic:      "\x1b[35m",   // magenta
-  legendary: "\x1b[33m",   // yellow/gold
+  common:    "\x1b[38;2;153;153;153m",  // inactive   rgb(153,153,153)
+  uncommon:  "\x1b[38;2;78;186;101m",   // success    rgb(78,186,101)
+  rare:      "\x1b[38;2;177;185;249m",  // permission rgb(177,185,249)
+  epic:      "\x1b[38;2;175;135;255m",  // autoAccept rgb(175,135,255)
+  legendary: "\x1b[38;2;255;193;7m",    // warning    rgb(255,193,7)
 };
 
 const SHINY_COLOR = "\x1b[93m"; // bright yellow

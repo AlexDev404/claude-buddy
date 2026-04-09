@@ -19,12 +19,22 @@ NAME=$(jq -r '.name // ""' "$STATE" 2>/dev/null)
 
 SPECIES=$(jq -r '.species // ""' "$STATE" 2>/dev/null)
 HAT=$(jq -r '.hat // "none"' "$STATE" 2>/dev/null)
-SHINY=$(jq -r '.shiny // false' "$STATE" 2>/dev/null)
-STARS=$(jq -r '.stars // ""' "$STATE" 2>/dev/null)
+RARITY=$(jq -r '.rarity // "common"' "$STATE" 2>/dev/null)
 REACTION=$(jq -r '.reaction // ""' "$STATE" 2>/dev/null)
 E=$(jq -r '.bones.eye // "°"' "$COMPANION" 2>/dev/null)
 
 cat > /dev/null  # drain stdin
+
+# ─── Rarity color (pC4 = dark theme, the default) ────────────────────────────
+NC=$'\033[0m'
+case "$RARITY" in
+  common)    C=$'\033[38;2;153;153;153m' ;;  # inactive   rgb(153,153,153)
+  uncommon)  C=$'\033[38;2;78;186;101m'  ;;  # success    rgb(78,186,101)
+  rare)      C=$'\033[38;2;177;185;249m' ;;  # permission rgb(177,185,249)
+  epic)      C=$'\033[38;2;175;135;255m' ;;  # autoAccept rgb(175,135,255)
+  legendary) C=$'\033[38;2;255;193;7m'   ;;  # warning    rgb(255,193,7)
+  *)         C=$'\033[0m' ;;
+esac
 
 B=$'\xe2\xa0\x80'  # Braille Blank U+2800
 
@@ -89,28 +99,40 @@ if [ -n "$REACTION" ] && [ "$REACTION" != "null" ] && [ "$REACTION" != "" ]; the
     BUBBLE="\"${REACTION}\""
 fi
 
-# ─── Build lines ─────────────────────────────────────────────────────────────
+# ─── Build lines (name centered under the face) ─────────────────────────────
 LINES=()
 [ -n "$HAT_LINE" ] && LINES+=("$HAT_LINE")
-LINES+=("$L1" "$L2" "$L3")
-[ -n "$L4" ] && LINES+=("$L4")
-LINES+=("$NAME $SHINY_ICON$STARS")
-[ -n "$BUBBLE" ] && LINES+=("$BUBBLE")
+ART_LINES=("$L1" "$L2" "$L3")
+[ -n "$L4" ] && ART_LINES+=("$L4")
+
+# Center the name
+NAME_LEN=${#NAME}
+ART_CENTER=4
+NAME_PAD=$(( ART_CENTER - NAME_LEN / 2 ))
+[ "$NAME_PAD" -lt 0 ] && NAME_PAD=0
+NAME_LINE="$(printf '%*s%s' "$NAME_PAD" '' "$NAME")"
 
 # ─── Right-align ─────────────────────────────────────────────────────────────
-# Art is max ~12 chars. We want it near the right edge.
-# Use regular spaces for the gap (preserved because Braille Blank leads).
-# One Braille Blank = ~2 display cols, so subtract 2 for it.
 ART_W=14
 MARGIN=8
 PAD=$(( COLS - ART_W - MARGIN ))
 [ "$PAD" -lt 0 ] && PAD=0
 
-# Build: ONE Braille Blank (trim-guard) + PAD regular spaces
 SPACER=$(printf "${B}%${PAD}s" "")
 
-for line in "${LINES[@]}"; do
-    echo "${SPACER}${line}"
+# Art lines: rarity color (no bold)
+[ -n "$HAT_LINE" ] && echo "${SPACER}${C}${HAT_LINE}${NC}"
+for line in "${ART_LINES[@]}"; do
+    echo "${SPACER}${C}${line}${NC}"
 done
+
+# Name: italic + dim gray (matches original: {italic: true, dimColor: true})
+DIM=$'\033[2;3m'
+echo "${SPACER}${DIM}${NAME_LINE}${NC}"
+
+# Bubble: dim
+if [ -n "$BUBBLE" ]; then
+    echo "${SPACER}${DIM}${BUBBLE}${NC}"
+fi
 
 exit 0
