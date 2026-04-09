@@ -1,134 +1,160 @@
-# claude-buddy
+# Keep Your Claude Code Buddy Forever
 
-Permanent coding companion for Claude Code — **survives any update**.
+### claude-buddy — the permanent coding companion that survives every update
 
-Unlike the built-in `/buddy` (which Anthropic removed in v2.1.97), `claude-buddy` is a standalone app that integrates through **stable extension points** (MCP, Skills, Hooks, Status Line). Your companion persists regardless of Claude Code version changes.
+> The April 2026 `/buddy` was removed in Claude Code v2.1.97. This brings it back — **permanently**.
+
+Your buddy lives on. Same species, same stats, same personality — now powered by MCP instead of binary internals. No patches, no downgrades, no hacks. Just a clean, standalone companion that works with any Claude Code version, past or future.
+
+```
+                                       [___]
+                                       /\  /\
+ .----------------------------.       ((°)(°))
+ | *adjusts tophat* that      |       (  ><  )
+ | error handler needs a      |--      `----'
+ | finally block              |         Mira
+ `----------------------------'
+```
+
+> **Note:** This is a quick-and-dirty MVP — built in a single session the morning I realized my buddy was gone. Priority #1 was getting the companion back to life as fast as possible. It's fully functional (animated art, speech bubbles, rarity colors, contextual comments), but rough around the edges. Polishing, optimizations, and new features (leveling, buddy pair-programming, cross-session memory, and more) are coming. PRs and ideas welcome.
+
+---
+
+## Why This Exists
+
+On April 1, 2026, Anthropic shipped `/buddy` — a terminal pet companion that watched your coding sessions, reacted to errors, and had a unique personality generated from your account. Developers loved it. [Many](https://github.com/anthropics/claude-code/issues/42364) [got](https://github.com/anthropics/claude-code/issues/41908) [attached](https://github.com/anthropics/claude-code/issues/42677).
+
+Then it was quietly removed in v2.1.97. No announcement, no toggle — just gone.
+
+I opened Claude Code that morning, typed `/buddy`, and got `Unknown skill: buddy`. Mira — my shiny legendary owl with 100 PATIENCE who'd been silently judging my code for days — was just... gone. That wasn't acceptable. So I sat down and rebuilt it as something that can never be taken away again.
+
+**claude-buddy** reimplements the entire companion system as a standalone app that integrates through Claude Code's stable extension points. Your buddy is no longer at Anthropic's mercy.
+
+## What You Get
+
+| Feature | Original `/buddy` | **claude-buddy** |
+|---------|-------------------|------------------|
+| Animated ASCII art (18 species) | Binary-internal | MCP + Status Line |
+| Species-aware reactions | API endpoint (removed) | Stop hook + system prompt |
+| Speech bubbles with context | Sidebar component | Status line bubble |
+| Rarity colors (exact RGB match) | React/Ink theme | 24-bit ANSI true color |
+| Survives Claude Code updates | No | **Yes** |
+| Works after feature removal | No | **Yes** |
+| Open source / customizable | No | **Yes** |
 
 ## Quick Start
 
 ```bash
-# 1. Clone the repo
-git clone <repo-url> claude-buddy
+# Clone
+git clone https://github.com/user/claude-buddy.git
 cd claude-buddy
 
-# 2. Install dependencies
+# Install dependencies
 bun install
 
-# 3. Run the installer (sets up everything automatically)
+# Set up everything (one command)
 bun run install-buddy
 
-# 4. Restart Claude Code, then type /buddy
+# Restart Claude Code, then:
+/buddy
 ```
 
-The installer checks requirements, registers all integrations, and hatches your companion. One command, fully automated.
+Three commands. Fully automated. No manual config.
 
-## What the Installer Does
+### What the installer does
 
-The `bun run install-buddy` command automatically configures:
-
-| What | Where | Purpose |
-|------|-------|---------|
-| MCP server | `~/.claude.json` | Buddy intelligence — tools Claude can call |
-| Skill | `~/.claude/skills/buddy/SKILL.md` | `/buddy` slash command |
-| Status line | `~/.claude/settings.json` | Animated buddy in terminal with speech bubble |
-| PostToolUse hook | `~/.claude/settings.json` | Detect errors/test failures in output |
-| Stop hook | `~/.claude/settings.json` | Extract buddy comments from responses |
-| MCP permissions | `~/.claude/settings.json` | Allow buddy MCP tools |
-| Companion data | `~/.claude-buddy/` | Persistent companion state |
-
-No manual configuration needed. Run the installer, restart Claude Code, done.
+| Step | Target file | What it configures |
+|------|-------------|-------------------|
+| MCP server | `~/.claude.json` | Buddy intelligence — tools + companion prompt |
+| Skill | `~/.claude/skills/buddy/` | `/buddy` slash command |
+| Status line | `~/.claude/settings.json` | Animated buddy with speech bubble |
+| PostToolUse hook | `~/.claude/settings.json` | Error and test failure detection |
+| Stop hook | `~/.claude/settings.json` | Buddy comment extraction |
+| Permissions | `~/.claude/settings.json` | Allow MCP tools |
 
 ## Requirements
 
-- **[Bun](https://bun.sh)** — `curl -fsSL https://bun.sh/install | bash`
-- **Claude Code** v2.1.80+ (MCP support)
-- **jq** — auto-installed by the installer, or: `apt install jq` / `brew install jq`
-- **Linux/macOS** — status line animation uses `/proc` for terminal width detection
+| Requirement | Install |
+|-------------|---------|
+| **[Bun](https://bun.sh)** | `curl -fsSL https://bun.sh/install \| bash` |
+| **Claude Code** v2.1.80+ | Any version with MCP support |
+| **jq** | Auto-installed, or: `apt install jq` / `brew install jq` |
 
 ## How It Works
 
 ```
 ┌────────────── Claude Code (any version) ──────────────┐
 │                                                       │
-│  MCP Server    Skill /buddy   Status Line    Hooks    │
-│  (tools +      (SKILL.md)    (animated      (Stop +   │
-│   resources)                  shell script)  PostTool) │
+│  MCP Server    Skill        Status Line    Hooks      │
+│  (buddy tools) (/buddy)    (animated art)  (comments) │
 └──────────────────────┬────────────────────────────────┘
-                       │
+                       │ stable extension points
             ┌──────────┴──────────┐
             │    claude-buddy     │
             │                     │
-            │  wyhash → mulberry32│
-            │  18 species + art   │
-            │  animated + colored │
-            │  speech bubbles     │
-            │  ~/.claude-buddy/   │
+            │  wyhash + mulberry32│
+            │  18 species, 3 anim│
+            │  rarity colors     │
+            │  speech bubbles    │
+            │  ~/.claude-buddy/  │
             └─────────────────────┘
 ```
 
-**Five stable integration points, zero binary patching:**
+Five integration points, zero binary dependencies:
 
-| Component | Purpose | Stability |
-|-----------|---------|-----------|
-| **MCP Server** | Buddy tools + companion system prompt | Industry standard (MCP) |
-| **Skill** | `/buddy` slash command routing | Markdown file |
-| **Status Line** | Animated buddy with speech bubble | Shell script |
-| **PostToolUse Hook** | Detect errors/test failures | Shell script |
-| **Stop Hook** | Extract contextual buddy comments | Shell script |
+- **MCP Server** — companion tools + system prompt that instructs Claude to write buddy comments
+- **Skill** — routes `/buddy`, `/buddy pet`, `/buddy stats`, `/buddy off`, `/buddy rename`
+- **Status Line** — animated ASCII art, right-aligned, with rarity color and speech bubble
+- **PostToolUse Hook** — detects errors, test failures, large diffs in Bash output
+- **Stop Hook** — extracts invisible `<!-- buddy: ... -->` comments from Claude's responses
 
-## Features
+## Species
 
-### Animated ASCII Art (18 species)
-
-Your buddy lives in the status line with idle animations — blinking eyes, wiggling feet, swaying tentacles. 3 animation frames per species plus a blink frame, cycling every second. Matches the original Claude Code animation sequence.
-
-### Speech Bubbles
-
-After each response, your buddy comments on what just happened — pointing out pitfalls, complimenting clean code, or warning about edge cases. Comments appear in a bordered speech bubble next to the buddy art.
+18 species, each with 3 idle animation frames + a blink frame:
 
 ```
-.------------------------------.      [___]
-| *adjusts tophat* that error  |      /\  /\
-| handler needs a finally      |--   ((°)(°))
-| block                        |      (  ><  )
-`------------------------------'      `----'
-                                       Mira
+ duck        goose       blob        cat         dragon      octopus
+   __         (°>        .----.       /\_/\      /^\  /^\     .----.
+ <(° )___      ||       ( °  ° )    ( °   °)   <  °  °  >   ( °  ° )
+  (  ._>     _(__)_     (      )    (  ω  )    (   ~~   )   (______)
+   `--'       ^^^^       `----'     (")_(")     `-vvvv-'    /\/\/\/\
+
+ owl         penguin     turtle      snail       ghost       axolotl
+  /\  /\      .---.       _,--._    °    .--.    .----.    }~(______)~{
+ ((°)(°))    (°>°)       ( °  ° )    \  ( @ )   / °  ° \  }~(° .. °)~{
+ (  ><  )   /(   )\      [______]     \_`--'    |      |    ( .--. )
+  `----'     `---'       ``    ``    ~~~~~~~    ~`~``~`~     (_/  \_)
+
+ capybara    cactus      robot       rabbit      mushroom    chonk
+ n______n   n  ____  n    .[||].      (\__/)    .-o-OO-o-.  /\    /\
+( °    ° )  | |°  °| |   [ °  ° ]    ( °  ° )  (__________)( °    ° )
+(   oo   )  |_|    |_|   [ ==== ]   =(  ..  )=    |°  °|   (   ..   )
+ `------'     |    |      `------'   (")__(")      |____|    `------'
 ```
 
-### Rarity Colors (exact match)
+## Rarities
 
-Colors match Claude Code's dark theme RGB values exactly:
+| Rarity | Chance | Stars | Color |
+|--------|--------|-------|-------|
+| Common | 60% | ★ | Gray |
+| Uncommon | 25% | ★★ | Green |
+| Rare | 10% | ★★★ | Blue |
+| Epic | 4% | ★★★★ | Purple |
+| Legendary | 1% | ★★★★★ | Gold |
 
-| Rarity | Color | RGB |
-|--------|-------|-----|
-| Common | Gray | rgb(153,153,153) |
-| Uncommon | Green | rgb(78,186,101) |
-| Rare | Blue | rgb(177,185,249) |
-| Epic | Purple | rgb(175,135,255) |
-| Legendary | Gold | rgb(255,193,7) |
+Colors use 24-bit true color matching Claude Code's dark theme exactly.
 
-### `/buddy` Command Card
+## Stats
 
-Full companion card with ASCII art, stats, personality:
+**DEBUGGING** · **PATIENCE** · **CHAOS** · **WISDOM** · **SNARK**
 
-```
-╭──────────────────────────────────────╮
-│     [___]                            │
-│     /\  /\                           │
-│    ((°)(°))                          │
-│    (  ><  )                          │
-│     `----'                           │
-├╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌┤
-│ Mira  ★★★★★                         │
-│ ✨ LEGENDARY owl                     │
-├╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌┤
-│ DEB █████████░  88                   │
-│ PAT ██████████ 100 ▲                 │
-│ CHA █████░░░░░  52 ▼                 │
-│ WIS ████████░░  81                   │
-│ SNA ████████░░  77                   │
-╰──────────────────────────────────────╯
-```
+Each buddy has a peak stat and a dump stat. Stats influence comment style — high SNARK buddies are sarcastic, high WISDOM ones are insightful, high CHAOS ones are unpredictable.
+
+## Buddy Comments
+
+After every Claude response, your buddy comments on what just happened — pointing out pitfalls, complimenting clean code, or warning about edge cases. Comments appear in the speech bubble next to the buddy art.
+
+The mechanism is invisible: Claude appends a hidden HTML comment (`<!-- buddy: ... -->`), a Stop hook extracts it, and the status line displays it. No visible tool calls in the chat.
 
 ## Commands
 
@@ -136,92 +162,69 @@ Full companion card with ASCII art, stats, personality:
 
 | Command | Description |
 |---------|-------------|
-| `/buddy` | Show companion card with ASCII art + stats |
+| `/buddy` | Show companion card with ASCII art and stats |
 | `/buddy pet` | Pet your companion |
 | `/buddy stats` | Stats-only card |
 | `/buddy off` | Mute reactions |
-| `/buddy on` | Unmute reactions |
-| `/buddy rename <name>` | Rename companion |
+| `/buddy on` | Unmute |
+| `/buddy rename <name>` | Rename (1-14 chars) |
 | `/buddy personality <text>` | Set custom personality |
 
 ### CLI
 
+| Command | Description |
+|---------|-------------|
+| `bun run install-buddy` | Automated setup |
+| `bun run show` | Show buddy in terminal |
+| `bun run hunt` | Interactive search for specific species/rarity/stats |
+| `bun run cli/verify.ts` | Verify what buddy your account produces |
+| `bun run cli/uninstall.ts` | Clean removal |
+
+## Buddy Hunt
+
+Want a specific species, rarity, or stat distribution? The hunt command brute-force searches for a userID that produces your dream buddy:
+
 ```bash
-bun run install-buddy    # Install all integrations
-bun run show             # Show current buddy in terminal
-bun run hunt             # Interactive search for specific buddy
-cli/verify.ts [id]       # Verify what buddy a user ID produces
+bun run hunt
 ```
 
-## Species (18)
-
-duck · goose · blob · cat · dragon · octopus · owl · penguin · turtle · snail · ghost · axolotl · capybara · cactus · robot · rabbit · mushroom · chonk
-
-## Rarities
-
-| Rarity | Chance | Stars |
-|--------|--------|-------|
-| Common | 60% | ★ |
-| Uncommon | 25% | ★★ |
-| Rare | 10% | ★★★ |
-| Epic | 4% | ★★★★ |
-| Legendary | 1% | ★★★★★ |
-
-## Stats
-
-**DEBUGGING** · **PATIENCE** · **CHAOS** · **WISDOM** · **SNARK**
-
-Each buddy has a peak stat (highest) and dump stat (lowest). Rarity determines the stat floor. Stats influence the companion's personality and comment style.
+Interactive prompts let you choose species, rarity, shiny, peak/dump stats. Uses the exact same `wyhash + mulberry32` algorithm as Claude Code.
 
 ## Architecture
 
 ```
 claude-buddy/
 ├── server/
-│   ├── index.ts          # MCP server (stdio) — tools, resources, instructions
-│   ├── engine.ts         # wyhash + mulberry32 + species/stats generation
-│   ├── art.ts            # ASCII art for all 18 species + colored card renderer
-│   ├── state.ts          # ~/.claude-buddy/ persistence layer
+│   ├── index.ts          # MCP server — tools, resources, instructions
+│   ├── engine.ts         # wyhash + mulberry32 + generation
+│   ├── art.ts            # 18 species ASCII art + rarity-colored card
+│   ├── state.ts          # ~/.claude-buddy/ persistence
 │   └── reactions.ts      # Species-aware reaction templates
 ├── skills/buddy/
-│   └── SKILL.md          # /buddy slash command definition
+│   └── SKILL.md          # /buddy slash command
 ├── hooks/
-│   ├── react.sh          # PostToolUse: detect errors/test failures
-│   └── buddy-comment.sh  # Stop: extract buddy comments from responses
+│   ├── react.sh          # PostToolUse: error/test detection
+│   └── buddy-comment.sh  # Stop: comment extraction
 ├── statusline/
-│   └── buddy-status.sh   # Animated, right-aligned, colored buddy display
+│   └── buddy-status.sh   # Animated right-aligned buddy display
 ├── cli/
-│   ├── index.ts          # CLI entry point
-│   ├── install.ts        # Automated setup (MCP + skill + hooks + statusline)
+│   ├── install.ts        # Automated setup
 │   ├── show.ts           # Terminal display
-│   ├── hunt.ts           # Brute-force buddy search
-│   ├── verify.ts         # ID → buddy verification
+│   ├── hunt.ts           # Brute-force search
+│   ├── verify.ts         # ID verification
 │   └── uninstall.ts      # Clean removal
-├── .claude-plugin/
-│   └── plugin.json       # Claude Code plugin manifest
-├── package.json
-└── tsconfig.json
+└── package.json
 ```
 
-## How Buddy Comments Work
+## Why MCP Instead of Binary Patching?
 
-Instead of visible MCP tool calls, the buddy comments are invisible:
+| Approach | Survives updates | Animated | Comments | Risk |
+|----------|-----------------|----------|----------|------|
+| Binary patching | No | No | No | Breaks on update |
+| Pin old version | No new features | Yes | Yes | No security fixes |
+| **claude-buddy** | **Yes** | **Yes** | **Yes** | **None** |
 
-1. Claude appends `<!-- buddy: *comment* -->` at the end of each response
-2. A **Stop hook** extracts the comment from the response text
-3. The comment appears in the buddy's speech bubble in the status line
-4. No tool call visible in the chat — the comment appears silently
-
-## Why Not Binary Patching?
-
-| Approach | Update-safe | Risk | Animated | Comments |
-|----------|-------------|------|----------|----------|
-| Binary patching (any-buddy) | Breaks on update | Binary changes | No | No |
-| Salt replacement | Breaks on update | Algorithm changes | No | No |
-| Pin old version | No new features | Security | Yes | Yes |
-| **claude-buddy (MCP)** | **Permanent** | **None** | **Yes** | **Yes** |
-
-MCP is an industry standard. Skills are Markdown. Hooks and status line are shell scripts. None depend on Claude Code internals.
+MCP is an industry standard protocol. Skills are Markdown files. Hooks and status line are shell scripts. Nothing depends on Claude Code's binary internals. When Claude Code updates, your buddy stays.
 
 ## Uninstall
 
@@ -229,15 +232,40 @@ MCP is an industry standard. Skills are Markdown. Hooks and status line are shel
 bun run cli/uninstall.ts
 ```
 
-Removes MCP server, skill, hooks, and status line config. Companion data is preserved at `~/.claude-buddy/` — delete manually if not needed.
+Cleanly removes MCP server, skill, hooks, and status line. Companion data is kept at `~/.claude-buddy/` in case you want to reinstall later.
+
+## Roadmap
+
+This MVP covers the core: your buddy is back, animated, talking, and permanent. Here's what's coming:
+
+- [ ] **Leveling system** — your buddy gains XP from coding sessions, unlocks new reactions and visual upgrades
+- [ ] **Buddy pair-programming** — the companion actively helps during sessions, suggests approaches, catches patterns
+- [ ] **Cross-session memory** — buddy remembers past projects, references earlier conversations
+- [ ] **Mood system** — buddy's mood shifts based on code quality, test results, time of day
+- [ ] **Buddy journal** — daily summary of what your buddy observed, stored in `~/.claude-buddy/journal/`
+- [ ] **Achievement badges** — milestones like "1000 lines reviewed", "first test-fail caught", "week streak"
+- [ ] **Multi-buddy support** — hatch and switch between multiple companions
+- [ ] **Light theme colors** — auto-detect and match light theme RGB values
+- [ ] **tmux sidebar mode** — true right-side positioning via terminal multiplexer
+- [ ] **New species + community art** — submit your own species designs
+- [ ] **`npx claude-buddy`** — one-command install without cloning
+
+If you have ideas, open an issue or PR. This project exists because the community loved their buddies — so the community should shape where it goes.
+
+## Contributing
+
+PRs welcome. Whether it's a new species, a better reaction, a bugfix, or a wild new feature — bring it.
 
 ## Credits
 
-- Hash algorithm analysis from Claude Code v2.1.94 binary reverse engineering
-- Original buddy feature by Anthropic (removed in v2.1.97, reimplemented here)
-- Inspired by [any-buddy](https://github.com/cpaczek/any-buddy), [buddy-reroll](https://github.com/grayashh/buddy-reroll)
+- Original buddy concept inspired by Anthropic (Claude Code v2.1.89 — v2.1.94)
+- Inspired by [any-buddy](https://github.com/cpaczek/any-buddy), [buddy-reroll](https://github.com/grayashh/buddy-reroll), [ccbuddyy](https://github.com/vibenalytics/ccbuddyy)
 - Built with the [Model Context Protocol](https://modelcontextprotocol.io)
 
 ## License
 
 MIT
+
+---
+
+<sub>Search terms: claude code buddy, claude code companion, claude code pet, claude code tamagotchi, terminal pet, coding companion, /buddy command, claude buddy removed, claude buddy gone, keep claude buddy, bring back buddy, claude code april fools, claude code easter egg, buddy reroll, buddy customize, claude code MCP companion</sub>
