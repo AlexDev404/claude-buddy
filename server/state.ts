@@ -1,32 +1,58 @@
 /**
  * State management — reads/writes companion data to ~/.claude-buddy/
  *
- * Storage layout (v2 — multi-buddy slots):
+ * Storage layout (v3 — single manifest):
  *   ~/.claude-buddy/
- *     active                  ← plain text: current slot name
- *     companions/
- *       <slot>.json           ← one file per saved buddy
- *     reaction.json           ← transient reaction state (unchanged)
- *     status.json             ← compact state for status line (unchanged)
+ *     menagerie.json   ← SSOT: { active, companions: { [slot]: Companion } }
+ *     reaction.json    ← transient reaction state
+ *     status.json      ← compact state for the status-line shell script
  *
- * Migration: on first load, if the legacy companion.json exists it is
- * moved into companions/<slug>.json and active is written automatically.
+ * Rules:
+ *   - saveCompanionSlot()  APPENDS only — throws if the slot already exists
+ *   - saveCompanion()      UPDATES the currently-active slot (rename / personality)
+ *   - All manifest writes are atomic (write tmp → rename)
  */
 
-import { readFileSync, writeFileSync, mkdirSync, existsSync, readdirSync, unlinkSync } from "fs";
+import {
+  readFileSync, writeFileSync, mkdirSync, existsSync, readdirSync, renameSync,
+} from "fs";
 import { join } from "path";
 import { homedir } from "os";
-import type { Companion, BuddyBones } from "./engine.ts";
+import type { Companion } from "./engine.ts";
 
 const STATE_DIR      = join(homedir(), ".claude-buddy");
-const COMPANIONS_DIR = join(STATE_DIR, "companions");
-const ACTIVE_FILE    = join(STATE_DIR, "active");
-const LEGACY_FILE    = join(STATE_DIR, "companion.json");  // pre-v2
+const MANIFEST_FILE  = join(STATE_DIR, "menagerie.json");
 const REACTION_FILE  = join(STATE_DIR, "reaction.json");
 
-function ensureDir(): void {
-  if (!existsSync(STATE_DIR))      mkdirSync(STATE_DIR,      { recursive: true });
-  if (!existsSync(COMPANIONS_DIR)) mkdirSync(COMPANIONS_DIR, { recursive: true });
+// ─── Manifest schema ─────────────────────────────────────────────────────────
+
+interface Manifest {
+  active: string;
+  companions: Record<string, Companion>;
+}
+
+function emptyManifest(): Manifest {
+  return { active: "buddy", companions: {} };
+}
+
+// ─── Atomic manifest I/O ─────────────────────────────────────────────────────
+
+function loadManifest(): Manifest {
+  try {
+    const raw = readFileSync(MANIFEST_FILE, "utf8");
+    const m = JSON.parse(raw) as Manifest;
+    if (!m.companions) m.companions = {};
+    return m;
+  } catch {
+    return emptyManifest();
+  }
+}
+
+function saveManifest(m: Manifest): void {
+  mkdirSync(STATE_DIR, { recursive: true });
+  const tmp = MANIFEST_FILE + ".tmp";
+  writeFileSync(tmp, JSON.stringify(m, null, 2));
+  renameSync(tmp, MANIFEST_FILE);  // atomic on same filesystem
 }
 
 // ─── Slot helpers ────────────────────────────────────────────────────────────
@@ -41,91 +67,149 @@ export function slugify(name: string): string {
     .slice(0, 14) || "buddy";
 }
 
-export function loadActiveSlot(): string {
-  try {
-    return readFileSync(ACTIVE_FILE, "utf8").trim() || "buddy";
-  } catch {
-    return "buddy";
+/**
+ * Return a random fallback name whose slug is not already in the manifest.
+ * Falls back to "buddy-<random 3 digits>" if all names are taken.
+ */
+export function unusedName(): string {
+  const { generateFallbackName } =
+    require("./reactions.ts") as typeof import("./reactions.ts");
+  const taken = new Set(Object.keys(loadManifest().companions));
+  // Try up to 50 random names before falling back to numbered name
+  for (let i = 0; i < 50; i++) {
+    const n = generateFallbackName();
+    if (!taken.has(slugify(n))) return n;
   }
+  let suffix = 0;
+  while (taken.has(`buddy-${suffix}`)) suffix++;
+  return `buddy-${suffix}`;
+}
+
+// ─── Active slot ─────────────────────────────────────────────────────────────
+
+export function loadActiveSlot(): string {
+  const m = loadManifest();
+  // Validate the active slot actually exists in the manifest
+  if (m.active && m.companions[m.active]) return m.active;
+  // Heal: point to the first available companion
+  const first = Object.keys(m.companions)[0];
+  if (first) {
+    m.active = first;
+    saveManifest(m);
+    return first;
+  }
+  return "buddy";
 }
 
 export function saveActiveSlot(slot: string): void {
-  ensureDir();
-  writeFileSync(ACTIVE_FILE, slot);
+  const m = loadManifest();
+  m.active = slot;
+  saveManifest(m);
 }
 
-// ─── Per-slot companion persistence ─────────────────────────────────────────
+// ─── Companion slot API ───────────────────────────────────────────────────────
 
 export function loadCompanionSlot(slot: string): Companion | null {
-  try {
-    return JSON.parse(readFileSync(join(COMPANIONS_DIR, `${slot}.json`), "utf8"));
-  } catch {
-    return null;
-  }
+  return loadManifest().companions[slot] ?? null;
 }
 
+/**
+ * APPEND a new companion to the manifest.
+ * Throws if the slot already exists — use saveCompanion() to update an existing buddy.
+ */
 export function saveCompanionSlot(companion: Companion, slot: string): void {
-  ensureDir();
-  writeFileSync(join(COMPANIONS_DIR, `${slot}.json`), JSON.stringify(companion, null, 2));
+  const m = loadManifest();
+  if (m.companions[slot]) {
+    throw new Error(`Slot "${slot}" already exists. Choose a different name.`);
+  }
+  m.companions[slot] = companion;
+  saveManifest(m);
 }
 
 export function deleteCompanionSlot(slot: string): void {
-  try {
-    unlinkSync(join(COMPANIONS_DIR, `${slot}.json`));
-  } catch { /* noop */ }
+  const m = loadManifest();
+  delete m.companions[slot];
+  if (m.active === slot) {
+    m.active = Object.keys(m.companions)[0] ?? "buddy";
+  }
+  saveManifest(m);
 }
 
 export function listCompanionSlots(): Array<{ slot: string; companion: Companion }> {
-  ensureDir();
-  try {
-    return readdirSync(COMPANIONS_DIR)
-      .filter((f) => f.endsWith(".json"))
-      .flatMap((f) => {
-        const slot = f.slice(0, -5);
-        const companion = loadCompanionSlot(slot);
-        return companion ? [{ slot, companion }] : [];
-      });
-  } catch {
-    return [];
-  }
+  return Object.entries(loadManifest().companions).map(([slot, companion]) => ({
+    slot, companion,
+  }));
 }
 
-// ─── Migration: legacy companion.json → companions/<slot>.json ───────────────
-
-function migrateIfNeeded(): void {
-  if (!existsSync(LEGACY_FILE)) return;
-  ensureDir();
-
-  const existing = readdirSync(COMPANIONS_DIR).filter((f) => f.endsWith(".json"));
-  if (existing.length === 0) {
-    // First boot after upgrade — move legacy companion into a slot
-    try {
-      const companion: Companion = JSON.parse(readFileSync(LEGACY_FILE, "utf8"));
-      const slot = slugify(companion.name);
-      saveCompanionSlot(companion, slot);
-      saveActiveSlot(slot);
-    } catch { /* malformed — just delete */ }
-  }
-
-  try { unlinkSync(LEGACY_FILE); } catch { /* noop */ }
-}
-
-// ─── Primary companion API (slot-aware) ──────────────────────────────────────
+// ─── Primary companion API ────────────────────────────────────────────────────
 
 export function loadCompanion(): Companion | null {
   migrateIfNeeded();
-  return loadCompanionSlot(loadActiveSlot());
+  const m = loadManifest();
+  return m.companions[m.active] ?? null;
 }
 
+/**
+ * UPDATE the currently-active companion (rename, personality changes, etc.).
+ * This is the ONLY intentional in-place update path.
+ */
 export function saveCompanion(companion: Companion): void {
-  saveCompanionSlot(companion, loadActiveSlot());
+  const m = loadManifest();
+  m.companions[m.active] = companion;
+  saveManifest(m);
 }
 
-export function deleteCompanion(): void {
-  deleteCompanionSlot(loadActiveSlot());
+// ─── Migration: per-file menagerie/ → single manifest ────────────────────────
+
+function migrateIfNeeded(): void {
+  if (existsSync(MANIFEST_FILE)) return;  // already on v3
+
+  const companions: Record<string, Companion> = {};
+  let active = "buddy";
+
+  // Absorb menagerie/<slot>.json files
+  const menagerieDir = join(STATE_DIR, "menagerie");
+  if (existsSync(menagerieDir)) {
+    try {
+      for (const f of readdirSync(menagerieDir).filter((f) => f.endsWith(".json"))) {
+        const slot = f.slice(0, -5);
+        try {
+          companions[slot] = JSON.parse(
+            readFileSync(join(menagerieDir, f), "utf8"),
+          );
+        } catch { /* skip malformed */ }
+      }
+    } catch { /* noop */ }
+  }
+
+  // Absorb legacy companion.json
+  const legacyFile = join(STATE_DIR, "companion.json");
+  if (existsSync(legacyFile) && Object.keys(companions).length === 0) {
+    try {
+      const c: Companion = JSON.parse(readFileSync(legacyFile, "utf8"));
+      const slot = slugify(c.name);
+      companions[slot] = c;
+      active = slot;
+    } catch { /* noop */ }
+  }
+
+  // Read active pointer if it exists
+  const activeFile = join(STATE_DIR, "active");
+  if (existsSync(activeFile)) {
+    try {
+      const a = readFileSync(activeFile, "utf8").trim();
+      if (a && companions[a]) active = a;
+    } catch { /* noop */ }
+  }
+
+  if (Object.keys(companions).length > 0) {
+    active = active && companions[active] ? active : Object.keys(companions)[0];
+  }
+
+  saveManifest({ active, companions });
 }
 
-// ─── Reaction state (for status line) ───────────────────────────────────────
+// ─── Reaction state (for status line) ────────────────────────────────────────
 
 export interface ReactionState {
   reaction: string;
@@ -136,7 +220,6 @@ export interface ReactionState {
 export function loadReaction(): ReactionState | null {
   try {
     const data: ReactionState = JSON.parse(readFileSync(REACTION_FILE, "utf8"));
-    // Reactions expire after 60 seconds
     if (Date.now() - data.timestamp > 60_000) return null;
     return data;
   } catch {
@@ -145,12 +228,12 @@ export function loadReaction(): ReactionState | null {
 }
 
 export function saveReaction(reaction: string, reason: string): void {
-  ensureDir();
+  mkdirSync(STATE_DIR, { recursive: true });
   const state: ReactionState = { reaction, timestamp: Date.now(), reason };
   writeFileSync(REACTION_FILE, JSON.stringify(state));
 }
 
-// ─── Identity resolution ────────────────────────────────────────────────────
+// ─── Identity resolution ─────────────────────────────────────────────────────
 
 export function resolveUserId(): string {
   try {
@@ -163,7 +246,7 @@ export function resolveUserId(): string {
   }
 }
 
-// ─── Status line state (compact JSON for the shell script) ──────────────────
+// ─── Status line state (compact JSON for the shell script) ───────────────────
 
 export interface StatusState {
   name: string;
@@ -171,25 +254,30 @@ export interface StatusState {
   rarity: string;
   stars: string;
   face: string;
+  eye: string;
   shiny: boolean;
   hat: string;
   reaction: string;
   muted: boolean;
 }
 
-export function writeStatusState(companion: Companion, reaction?: string, muted?: boolean): void {
-  ensureDir();
-  const { renderFace, RARITY_STARS } = require("./engine.ts") as typeof import("./engine.ts");
+export function writeStatusState(
+  companion: Companion, reaction?: string, muted?: boolean,
+): void {
+  mkdirSync(STATE_DIR, { recursive: true });
+  const { renderFace, RARITY_STARS } =
+    require("./engine.ts") as typeof import("./engine.ts");
   const state: StatusState = {
-    name: companion.name,
-    species: companion.bones.species,
-    rarity: companion.bones.rarity,
-    stars: RARITY_STARS[companion.bones.rarity],
-    face: renderFace(companion.bones.species, companion.bones.eye),
-    shiny: companion.bones.shiny,
-    hat: companion.bones.hat,
+    name:     companion.name,
+    species:  companion.bones.species,
+    rarity:   companion.bones.rarity,
+    stars:    RARITY_STARS[companion.bones.rarity],
+    face:     renderFace(companion.bones.species, companion.bones.eye),
+    eye:      companion.bones.eye,
+    shiny:    companion.bones.shiny,
+    hat:      companion.bones.hat,
     reaction: reaction ?? "",
-    muted: muted ?? false,
+    muted:    muted ?? false,
   };
   writeFileSync(join(STATE_DIR, "status.json"), JSON.stringify(state));
 }

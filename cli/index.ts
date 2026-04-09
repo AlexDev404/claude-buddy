@@ -6,7 +6,8 @@
  *   npx claude-buddy              Interactive install
  *   npx claude-buddy install      Install MCP + skill + hooks + statusline
  *   npx claude-buddy show         Show current buddy
- *   npx claude-buddy hunt         Search for a specific buddy
+ *   npx claude-buddy pick         Interactive two-pane buddy picker (saved + search)
+ *   npx claude-buddy hunt         Search for a specific buddy (non-interactive)
  *   npx claude-buddy uninstall    Remove all integrations
  *   npx claude-buddy verify       Verify what buddy your ID produces
  */
@@ -20,6 +21,9 @@ switch (command) {
     break;
   case "show":
     await import("./show.ts");
+    break;
+  case "pick":
+    await import("./pick.ts");
     break;
   case "hunt":
     await import("./hunt.ts");
@@ -47,7 +51,8 @@ claude-buddy — permanent coding companion for Claude Code
 Commands:
   install           Set up MCP server, skill, hooks, and status line
   show              Display your current buddy
-  hunt              Search for a specific buddy (species, rarity, stats)
+  pick              Interactive two-pane buddy picker (browse saved + search)
+  hunt              Search for a specific buddy (non-interactive)
   verify            Verify what buddy your current ID produces
   doctor            Run diagnostic report (paste output in bug reports)
   test-statusline   Install temporary diagnostic status line in Claude Code

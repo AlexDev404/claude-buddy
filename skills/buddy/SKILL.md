@@ -1,7 +1,7 @@
 ---
 name: buddy
 description: "Show, pet, or manage your coding companion. Use when the user types /buddy or mentions their companion by name."
-argument-hint: "[show|pet|off|on|stats|rename <name>|personality <text>]"
+argument-hint: "[show|pet|stats|off|on|rename <name>|personality <text>|summon [slot]|save [slot]|list|dismiss <slot>|pick]"
 allowed-tools: mcp__claude_buddy__*
 ---
 
@@ -22,6 +22,11 @@ Based on `$ARGUMENTS`:
 | `on` | Call `buddy_unmute` |
 | `rename <name>` | Call `buddy_rename` with the given name |
 | `personality <text>` | Call `buddy_set_personality` with the given text |
+| `summon [slot]` | Call `buddy_summon` with optional slot name (random if omitted) |
+| `save [slot]` | Call `buddy_save` with optional slot name |
+| `list` | Call `buddy_list` |
+| `dismiss <slot>` | Call `buddy_dismiss` with the slot name |
+| `pick` | Tell user to run `! bun run pick` from the claude-buddy directory (launches interactive TUI) |
 
 ## CRITICAL OUTPUT RULES
 

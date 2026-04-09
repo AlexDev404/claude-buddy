@@ -10,10 +10,8 @@
 # Uses Braille Blank (U+2800) for padding — survives JS .trim()
 
 STATE="$HOME/.claude-buddy/status.json"
-COMPANION="$HOME/.claude-buddy/companion.json"
 
 [ -f "$STATE" ] || exit 0
-[ -f "$COMPANION" ] || exit 0
 
 MUTED=$(jq -r '.muted // false' "$STATE" 2>/dev/null)
 [ "$MUTED" = "true" ] && exit 0
@@ -25,7 +23,8 @@ SPECIES=$(jq -r '.species // ""' "$STATE" 2>/dev/null)
 HAT=$(jq -r '.hat // "none"' "$STATE" 2>/dev/null)
 RARITY=$(jq -r '.rarity // "common"' "$STATE" 2>/dev/null)
 REACTION=$(jq -r '.reaction // ""' "$STATE" 2>/dev/null)
-E=$(jq -r '.bones.eye // "°"' "$COMPANION" 2>/dev/null)
+# eye is written to status.json by writeStatusState (v2+); fall back to "°"
+E=$(jq -r '.eye // "°"' "$STATE" 2>/dev/null)
 
 cat > /dev/null  # drain stdin
 

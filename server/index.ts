@@ -18,11 +18,11 @@ import {
 import {
   loadCompanion, saveCompanion, resolveUserId,
   loadReaction, saveReaction, writeStatusState,
-  loadActiveSlot, saveActiveSlot, slugify,
+  loadActiveSlot, saveActiveSlot, slugify, unusedName,
   loadCompanionSlot, saveCompanionSlot, deleteCompanionSlot, listCompanionSlots,
 } from "./state.ts";
 import {
-  getReaction, generateFallbackName, generatePersonalityPrompt,
+  getReaction, generatePersonalityPrompt,
 } from "./reactions.ts";
 import { renderCompanionCard } from "./art.ts";
 
@@ -57,16 +57,29 @@ function ensureCompanion(): Companion {
   let companion = loadCompanion();
   if (companion) return companion;
 
+  // Active slot missing — rescue the first saved companion
+  const saved = listCompanionSlots();
+  if (saved.length > 0) {
+    const { slot, companion: rescued } = saved[0];
+    saveActiveSlot(slot);
+    writeStatusState(rescued, `*${rescued.name} arrives*`);
+    return rescued;
+  }
+
+  // Menagerie is empty — generate a fresh companion in a new slot
   const userId = resolveUserId();
   const bones = generateBones(userId);
+  const name = unusedName();
   companion = {
     bones,
-    name: generateFallbackName(),
+    name,
     personality: `A ${bones.rarity} ${bones.species} who watches code with quiet intensity.`,
     hatchedAt: Date.now(),
     userId,
   };
-  saveCompanion(companion);
+  const slot = slugify(name);
+  saveCompanionSlot(companion, slot);
+  saveActiveSlot(slot);
   writeStatusState(companion);
   return companion;
 }
@@ -240,7 +253,7 @@ server.tool(
       const saved = listCompanionSlots();
       if (saved.length === 0) {
         return {
-          content: [{ type: "text", text: "No saved buddies yet. Use buddy_summon with a slot name to create one." }],
+          content: [{ type: "text", text: "Your menagerie is empty. Use buddy_summon with a slot name to add one." }],
         };
       }
       targetSlot = saved[Math.floor(Math.random() * saved.length)].slot;
@@ -248,18 +261,12 @@ server.tool(
       targetSlot = slugify(slot);
     }
 
-    // Load existing or generate new
-    let companion = loadCompanionSlot(targetSlot);
+    // Load existing — unknown slot names only load, never auto-create
+    const companion = loadCompanionSlot(targetSlot);
     if (!companion) {
-      const bones = generateBones(userId, targetSlot);
-      companion = {
-        bones,
-        name: generateFallbackName(),
-        personality: `A ${bones.rarity} ${bones.species} who watches code with quiet intensity.`,
-        hatchedAt: Date.now(),
-        userId,
+      return {
+        content: [{ type: "text", text: `No buddy found in slot "${targetSlot}". Use /buddy list to see saved buddies.` }],
       };
-      saveCompanionSlot(companion, targetSlot);
     }
 
     saveActiveSlot(targetSlot);
@@ -307,7 +314,7 @@ server.tool(
     const activeSlot = loadActiveSlot();
 
     if (saved.length === 0) {
-      return { content: [{ type: "text", text: "No saved buddies yet." }] };
+      return { content: [{ type: "text", text: "Your menagerie is empty. Use buddy_summon <slot> to add one." }] };
     }
 
     const lines = saved.map(({ slot, companion }) => {

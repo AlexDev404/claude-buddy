@@ -5,11 +5,11 @@
 
 STATE_DIR="$HOME/.claude-buddy"
 REACTION_FILE="$STATE_DIR/reaction.json"
-COMPANION_FILE="$STATE_DIR/companion.json"
+STATUS_FILE="$STATE_DIR/status.json"
 COOLDOWN_FILE="$STATE_DIR/.last_reaction"
 
 # Exit if no companion
-[ -f "$COMPANION_FILE" ] || exit 0
+[ -f "$STATUS_FILE" ] || exit 0
 
 # Read hook input from stdin
 INPUT=$(cat)
@@ -26,9 +26,9 @@ fi
 RESULT=$(echo "$INPUT" | jq -r '.tool_result // ""' 2>/dev/null)
 [ -z "$RESULT" ] && exit 0
 
-# Read species for species-aware reactions
-SPECIES=$(jq -r '.bones.species // "blob"' "$COMPANION_FILE" 2>/dev/null)
-NAME=$(jq -r '.name // "buddy"' "$COMPANION_FILE" 2>/dev/null)
+# Read species/name from status.json (v2+; no longer needs companion.json)
+SPECIES=$(jq -r '.species // "blob"' "$STATUS_FILE" 2>/dev/null)
+NAME=$(jq -r '.name // "buddy"' "$STATUS_FILE" 2>/dev/null)
 
 REASON=""
 REACTION=""
