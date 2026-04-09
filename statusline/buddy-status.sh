@@ -246,34 +246,56 @@ if [ -n "$BUBBLE" ]; then
     BUBBLE_TEXT="${BUBBLE_TEXT#\"}"
 fi
 
-BUBBLE_LINES=()
+# ─── Word-wrap bubble text ────────────────────────────────────────────────────
+INNER_W=28
+TEXT_LINES=()
 if [ -n "$BUBBLE_TEXT" ]; then
-    # Max bubble width: generous — use the space left of the art
-    BUBBLE_W=30
-    # Word-wrap into lines of BUBBLE_W
     WORDS=($BUBBLE_TEXT)
     CUR_LINE=""
     for word in "${WORDS[@]}"; do
         if [ -z "$CUR_LINE" ]; then
             CUR_LINE="$word"
-        elif [ $(( ${#CUR_LINE} + 1 + ${#word} )) -le $BUBBLE_W ]; then
+        elif [ $(( ${#CUR_LINE} + 1 + ${#word} )) -le $INNER_W ]; then
             CUR_LINE="$CUR_LINE $word"
         else
-            BUBBLE_LINES+=("$CUR_LINE")
+            TEXT_LINES+=("$CUR_LINE")
             CUR_LINE="$word"
         fi
     done
-    [ -n "$CUR_LINE" ] && BUBBLE_LINES+=("$CUR_LINE")
+    [ -n "$CUR_LINE" ] && TEXT_LINES+=("$CUR_LINE")
+fi
+
+TEXT_COUNT=${#TEXT_LINES[@]}
+
+# Build box as plain strings (no ANSI). Color applied at output time.
+# Box display width = INNER_W + 4:  "| " + text(INNER_W) + " |"
+BOX_W=$(( INNER_W + 4 ))
+BUBBLE_LINES=()
+BUBBLE_TYPES=()  # "border" or "text" — determines coloring
+if [ $TEXT_COUNT -gt 0 ]; then
+    # Top border
+    BORDER=$(printf '%*s' "$(( BOX_W - 2 ))" '' | tr ' ' '-')
+    BUBBLE_LINES+=(".${BORDER}.")
+    BUBBLE_TYPES+=("border")
+    # Text rows: "| text padded |"
+    for tl in "${TEXT_LINES[@]}"; do
+        tpad=$(( INNER_W - ${#tl} ))
+        [ "$tpad" -lt 0 ] && tpad=0
+        padding=$(printf '%*s' "$tpad" '')
+        BUBBLE_LINES+=("| ${tl}${padding} |")
+        BUBBLE_TYPES+=("text")
+    done
+    # Bottom border
+    BUBBLE_LINES+=("\`${BORDER}'")
+    BUBBLE_TYPES+=("border")
 fi
 
 BUBBLE_COUNT=${#BUBBLE_LINES[@]}
 
-# ─── Right-align with bubble to the left ─────────────────────────────────────
-# Layout: [spacer][bubble_col][gap][art_col]
-# bubble_col is BUBBLE_W+2 wide (for quotes), art_col is ART_W wide
-GAP=3
+# ─── Right-align with bubble box to the left ─────────────────────────────────
+GAP=2
 if [ $BUBBLE_COUNT -gt 0 ]; then
-    TOTAL_W=$(( BUBBLE_W + 2 + GAP + ART_W ))
+    TOTAL_W=$(( BOX_W + GAP + ART_W ))
 else
     TOTAL_W=$ART_W
 fi
@@ -284,28 +306,34 @@ PAD=$(( COLS - TOTAL_W - MARGIN ))
 SPACER=$(printf "${B}%${PAD}s" "")
 GAP_STR=$(printf '%*s' "$GAP" '')
 
-# Vertically center bubble on the art
+# Vertically center bubble box on the art
 BUBBLE_START=0
 if [ $BUBBLE_COUNT -gt 0 ] && [ $BUBBLE_COUNT -lt $ART_COUNT ]; then
     BUBBLE_START=$(( (ART_COUNT - BUBBLE_COUNT) / 2 ))
 fi
 
-# ─── Output: merged bubble + art per line ─────────────────────────────────────
+# ─── Output: merged bubble box + art per line ────────────────────────────────
 for (( i=0; i<ART_COUNT; i++ )); do
     art_part="${ALL_COLORS[$i]}${ALL_LINES[$i]}${NC}"
 
     if [ $BUBBLE_COUNT -gt 0 ]; then
         bi=$(( i - BUBBLE_START ))
         if [ $bi -ge 0 ] && [ $bi -lt $BUBBLE_COUNT ]; then
-            # Pad bubble line to fixed width
             bline="${BUBBLE_LINES[$bi]}"
-            bpad=$(( BUBBLE_W - ${#bline} ))
-            [ "$bpad" -lt 0 ] && bpad=0
-            padding=$(printf '%*s' "$bpad" '')
-            echo "${SPACER}${DIM}\"${bline}\"${padding}${NC}${GAP_STR}${art_part}"
+            btype="${BUBBLE_TYPES[$bi]}"
+            if [ "$btype" = "border" ]; then
+                # Border lines: full rarity color
+                echo "${SPACER}${C}${bline}${NC}${GAP_STR}${art_part}"
+            else
+                # Text lines: colored pipes, dim text
+                # Split: first char "|", then content, last char "|"
+                pipe_l="${bline:0:1}"
+                pipe_r="${bline: -1}"
+                inner="${bline:1:$(( ${#bline} - 2 ))}"
+                echo "${SPACER}${C}${pipe_l}${NC}${DIM}${inner}${NC}${C}${pipe_r}${NC}${GAP_STR}${art_part}"
+            fi
         else
-            # Empty bubble column to keep art aligned
-            empty=$(printf '%*s' "$(( BUBBLE_W + 2 ))" '')
+            empty=$(printf '%*s' "$BOX_W" '')
             echo "${SPACER}${empty}${GAP_STR}${art_part}"
         fi
     else
