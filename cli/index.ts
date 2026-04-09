@@ -36,6 +36,9 @@ switch (command) {
   case "test-statusline":
     await import("./test-statusline.ts");
     break;
+  case "backup":
+    await import("./backup.ts");
+    break;
   case "--help":
   case "-h":
     console.log(`
@@ -48,6 +51,7 @@ Commands:
   verify            Verify what buddy your current ID produces
   doctor            Run diagnostic report (paste output in bug reports)
   test-statusline   Install temporary diagnostic status line in Claude Code
+  backup            Snapshot or restore all claude-buddy state
   uninstall         Remove all claude-buddy integrations
 
 Options:
