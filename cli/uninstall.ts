@@ -72,7 +72,7 @@ try {
     changed = true;
   }
 
-  for (const hookType of ["PostToolUse", "Stop", "SessionStart", "SessionEnd"] as const) {
+  for (const hookType of ["PostToolUse", "Stop", "UserPromptSubmit", "SessionStart", "SessionEnd"] as const) {
     if (settings.hooks?.[hookType]) {
       const before = settings.hooks[hookType].length;
       settings.hooks[hookType] = settings.hooks[hookType].filter(
@@ -100,6 +100,18 @@ if (existsSync(SKILL_DIR)) {
   ok("Skill removed");
 } else {
   warn("Skill not found (already removed)");
+}
+
+// Remove plugin/marketplace remnants (from `claude plugin install`)
+const PLUGIN_DIRS = [
+  join(CLAUDE_DIR, "plugins", "marketplaces", "claude-buddy"),
+  join(CLAUDE_DIR, "plugins", "cache", "claude-buddy"),
+];
+for (const dir of PLUGIN_DIRS) {
+  if (existsSync(dir)) {
+    rmSync(dir, { recursive: true });
+    ok(`Plugin cache removed: ${dir}`);
+  }
 }
 
 // Keep state dir (companion data) — user might want it back
