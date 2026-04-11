@@ -133,6 +133,9 @@ bun test
 All tests must pass before a PR can be merged — this is enforced by CI.
 Run it locally before pushing to catch failures early.
 
+For a full breakdown of what's covered, what isn't, and why, see
+[TESTING.md](./TESTING.md).
+
 ### Where the tests live
 
 Tests live next to the code they cover:
@@ -141,6 +144,8 @@ Tests live next to the code they cover:
   generator (`generateBones`, `hashString`, `mulberry32`, `renderFace`,
   `renderCompact`)
 - `server/state.test.ts` — pure helper tests (`slugify`)
+- `server/reactions.test.ts` — reactions, fallback names, and personality
+  prompt (`getReaction`, `generateFallbackName`, `generatePersonalityPrompt`)
 
 ### Adding new tests
 
