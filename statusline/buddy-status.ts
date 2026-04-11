@@ -170,9 +170,41 @@ if (textLines.length > 0) {
 }
 
 // ─── Terminal width ─────────────────────────────────────────────────────────
+// stdout is piped by Claude Code, so process.stdout.columns is undefined.
+// Try multiple sources: stderr (may still be a TTY), env, tput, fallback.
 
-let cols = process.stdout.columns || 125;
-if (cols < 40) cols = 125;
+function detectCols(): number {
+  // 1. stdout (unlikely when piped, but try)
+  if (process.stdout.columns && process.stdout.columns > 40) return process.stdout.columns;
+  // 2. stderr (often still connected to TTY)
+  if (process.stderr.columns && process.stderr.columns > 40) return process.stderr.columns;
+  // 3. COLUMNS env var
+  const envCols = parseInt(process.env.COLUMNS ?? "", 10);
+  if (envCols > 40) return envCols;
+  // 4. Walk process tree to find PTY (Linux only, same approach as bash version)
+  try {
+    const { execSync } = require("child_process");
+    const { readlinkSync } = require("fs");
+    let pid = process.ppid;
+    for (let i = 0; i < 5 && pid > 1; i++) {
+      try {
+        const pty = readlinkSync(`/proc/${pid}/fd/0`);
+        if (pty.startsWith("/dev/pts/") || pty.startsWith("/dev/tty")) {
+          const size = execSync(`stty size < "${pty}"`, { encoding: "utf8", timeout: 500 }).trim();
+          const c = parseInt(size.split(/\s+/)[1], 10);
+          if (c > 40) return c;
+        }
+      } catch {}
+      try {
+        pid = parseInt(execSync(`ps -o ppid= -p ${pid}`, { encoding: "utf8", timeout: 500 }).trim(), 10);
+      } catch { break; }
+    }
+  } catch {}
+  // 5. fallback
+  return 125;
+}
+
+let cols = detectCols();
 
 // ─── Right-align with bubble ────────────────────────────────────────────────
 
