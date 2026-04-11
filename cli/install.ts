@@ -55,19 +55,12 @@ function preflight(): boolean {
     pass = false;
   }
 
-  // Check jq (needed for status line + hooks)
+  // Check jq (only needed for tmux popup mode — bash scripts)
   try {
     execSync("jq --version", { stdio: "ignore" });
     ok("jq found");
   } catch {
-    warn("jq not found — installing...");
-    try {
-      execSync("sudo apt-get install -y jq 2>/dev/null || brew install jq 2>/dev/null", { stdio: "ignore" });
-      ok("jq installed");
-    } catch {
-      err("Could not install jq. Install manually: apt install jq / brew install jq");
-      pass = false;
-    }
+    info("jq not found (only needed for tmux popup mode)");
   }
 
   // Check ~/.claude/ exists
@@ -140,7 +133,7 @@ function installSkill() {
 // ─── Step 3: Configure status line (with animation refresh) ─────────────────
 
 function installStatusLine(settings: Record<string, any>) {
-  const statusScript = join(PROJECT_ROOT, "statusline", "buddy-status.sh");
+  const statusScript = `bun ${join(PROJECT_ROOT, "statusline", "buddy-status.ts")}`;
 
   settings.statusLine = {
     type: "command",
@@ -196,9 +189,9 @@ function installPopupHooks(settings: Record<string, any>) {
 // ─── Step 4: Register hooks ─────────────────────────────────────────────────
 
 function installHooks(settings: Record<string, any>) {
-  const reactHook    = join(PROJECT_ROOT, "hooks", "react.sh");
-  const commentHook  = join(PROJECT_ROOT, "hooks", "buddy-comment.sh");
-  const nameHook     = join(PROJECT_ROOT, "hooks", "name-react.sh");
+  const reactHook    = `bun ${join(PROJECT_ROOT, "hooks", "react.ts")}`;
+  const commentHook  = `bun ${join(PROJECT_ROOT, "hooks", "buddy-comment.ts")}`;
+  const nameHook     = `bun ${join(PROJECT_ROOT, "hooks", "name-react.ts")}`;
 
   if (!settings.hooks) settings.hooks = {};
 
