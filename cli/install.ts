@@ -10,6 +10,10 @@ import { execSync } from "child_process";
 import { join, resolve, dirname } from "path";
 import { homedir } from "os";
 
+/** Normalize Windows backslash paths to POSIX forward slashes for config files
+ *  (Git Bash eats lone backslashes as escape characters). */
+const toPosix = (p: string) => p.replace(/\\/g, "/");
+
 import { generateBones, renderBuddy, renderFace, RARITY_STARS } from "../server/engine.ts";
 import { loadCompanion, saveCompanion, resolveUserId, writeStatusState } from "../server/state.ts";
 import { generateFallbackName } from "../server/reactions.ts";
@@ -113,8 +117,8 @@ function installMcp() {
 
   claudeJson.mcpServers["claude-buddy"] = {
     command: "bun",
-    args: [serverPath],
-    cwd: PROJECT_ROOT,
+    args: [toPosix(serverPath)],
+    cwd: toPosix(PROJECT_ROOT),
   };
 
   writeFileSync(claudeJsonPath, JSON.stringify(claudeJson, null, 2));
@@ -133,7 +137,7 @@ function installSkill() {
 // ─── Step 3: Configure status line (with animation refresh) ─────────────────
 
 function installStatusLine(settings: Record<string, any>) {
-  const statusScript = `bun ${join(PROJECT_ROOT, "statusline", "buddy-status.ts")}`;
+  const statusScript = `bun ${toPosix(join(PROJECT_ROOT, "statusline", "buddy-status.ts"))}`;
 
   settings.statusLine = {
     type: "command",
@@ -161,7 +165,7 @@ function detectTmux(): boolean {
 }
 
 function installPopupHooks(settings: Record<string, any>) {
-  const popupManager = join(PROJECT_ROOT, "popup", "popup-manager.sh");
+  const popupManager = toPosix(join(PROJECT_ROOT, "popup", "popup-manager.sh"));
 
   if (!settings.hooks) settings.hooks = {};
 
@@ -189,9 +193,9 @@ function installPopupHooks(settings: Record<string, any>) {
 // ─── Step 4: Register hooks ─────────────────────────────────────────────────
 
 function installHooks(settings: Record<string, any>) {
-  const reactHook    = `bun ${join(PROJECT_ROOT, "hooks", "react.ts")}`;
-  const commentHook  = `bun ${join(PROJECT_ROOT, "hooks", "buddy-comment.ts")}`;
-  const nameHook     = `bun ${join(PROJECT_ROOT, "hooks", "name-react.ts")}`;
+  const reactHook    = `bun ${toPosix(join(PROJECT_ROOT, "hooks", "react.ts"))}`;
+  const commentHook  = `bun ${toPosix(join(PROJECT_ROOT, "hooks", "buddy-comment.ts"))}`;
+  const nameHook     = `bun ${toPosix(join(PROJECT_ROOT, "hooks", "name-react.ts"))}`;
 
   if (!settings.hooks) settings.hooks = {};
 

@@ -15,7 +15,10 @@ import { homedir } from "os";
 
 const PROJECT_ROOT = resolve(dirname(import.meta.dir));
 const HOME = homedir();
-const STATUS_SCRIPT = join(PROJECT_ROOT, "statusline", "buddy-status.sh");
+/** Normalize Windows backslash paths to POSIX forward slashes. */
+const toPosix = (p: string) => p.replace(/\\/g, "/");
+
+const STATUS_SCRIPT = toPosix(join(PROJECT_ROOT, "statusline", "buddy-status.sh"));
 
 const RED = "\x1b[31m";
 const GREEN = "\x1b[32m";
