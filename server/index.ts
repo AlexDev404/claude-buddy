@@ -239,6 +239,7 @@ server.tool(
       "  /buddy summon     Summon a saved buddy (omit slot for random)",
       "  /buddy save       Save current buddy to a named slot",
       "  /buddy list       List all saved buddies",
+      "  /buddy pick       Generate a new random buddy (optional: species, rarity)",
       "  /buddy dismiss    Remove a saved buddy slot",
       "  /buddy pick       Launch interactive TUI picker (! bun run pick)",
       "  /buddy frequency  Show or set comment cooldown (tmux only)",
@@ -457,6 +458,80 @@ server.tool(
     return {
       content: [{ type: "text", text: `${companion.name} [${targetSlot}] dismissed.` }],
     };
+  },
+);
+
+// ─── Tool: buddy_pick ────────────────────────────────────────────────────────
+
+server.tool(
+  "buddy_pick",
+  "Generate a new random buddy and add it to the menagerie. Optionally filter by species and/or rarity. The new buddy becomes the active one.",
+  {
+    species: z.enum(SPECIES).optional().describe(
+      "Desired species (e.g. 'turtle', 'cat', 'dragon'). If omitted, any species.",
+    ),
+    rarity: z.enum(RARITIES).optional().describe(
+      "Desired rarity (e.g. 'legendary', 'epic', 'rare'). If omitted, any rarity. Higher rarities need more attempts and may take a moment.",
+    ),
+    name: z.string().min(1).max(14).optional().describe(
+      "Name for the new buddy (1-14 chars). If omitted, a random name is chosen.",
+    ),
+  },
+  async ({ species, rarity, name }) => {
+    const { randomBytes } = require("crypto") as typeof import("crypto");
+
+    const maxAttempts =
+      rarity === "legendary" ? 5_000_000 :
+      rarity === "epic"      ? 2_000_000 :
+      rarity === "rare"      ? 1_000_000 : 500_000;
+
+    let bones = null;
+    let userId = "";
+
+    for (let i = 0; i < maxAttempts; i++) {
+      userId = randomBytes(16).toString("hex");
+      const candidate = generateBones(userId);
+      if (species && candidate.species !== species) continue;
+      if (rarity && candidate.rarity !== rarity) continue;
+      bones = candidate;
+      break;
+    }
+
+    if (!bones) {
+      return {
+        content: [{ type: "text", text: `No match found after ${maxAttempts.toLocaleString()} attempts. Try broader criteria (e.g. drop the rarity filter, or pick a different species).` }],
+      };
+    }
+
+    const buddyName = name ?? unusedName();
+    const slot = slugify(buddyName);
+
+    if (loadCompanionSlot(slot)) {
+      return {
+        content: [{ type: "text", text: `A buddy in slot "${slot}" already exists. Pick a different name.` }],
+      };
+    }
+
+    const companion: Companion = {
+      bones,
+      name: buddyName,
+      personality: `A ${bones.rarity} ${bones.species} who watches code with quiet intensity.`,
+      hatchedAt: Date.now(),
+      userId,
+    };
+
+    saveCompanionSlot(companion, slot);
+    saveActiveSlot(slot);
+    writeStatusState(companion, `*${buddyName} hatches*`);
+
+    const card = renderCompanionCardMarkdown(
+      companion.bones,
+      companion.name,
+      companion.personality,
+      `*${buddyName} hatches*`,
+    );
+
+    return { content: [{ type: "text", text: card }] };
   },
 );
 
