@@ -6,7 +6,7 @@
                 "hooks": [
                     {
                         "type": "command",
-                        "command": "./hooks/react.sh"
+                        "command": "bun ./hooks/react.ts"
                     }
                 ]
             }
@@ -16,7 +16,7 @@
                 "hooks": [
                     {
                         "type": "command",
-                        "command": "./hooks/buddy-comment.sh"
+                        "command": "bun ./hooks/buddy-comment.ts"
                     }
                 ]
             }
@@ -26,7 +26,7 @@
                 "hooks": [
                     {
                         "type": "command",
-                        "command": "./hooks/name-react.sh"
+                        "command": "bun ./hooks/name-react.ts"
                     }
                 ]
             }
