@@ -90,6 +90,15 @@ function preflight(): boolean {
   return pass;
 }
 
+// Path normalization (Windows compat)
+// Node's path.join() produces backslash paths on Windows, which bash treats as
+// escape sequences, stripping them entirely (e.g. C:\Users -> C:Users).
+// Use forward slashes in all paths written to config files.
+
+function toUnixPath(p: string): string {
+  return p.replace(/\\/g, "/");
+}
+
 // ─── Load / update settings.json ────────────────────────────────────────────
 
 function loadSettings(): Record<string, any> {
@@ -120,8 +129,8 @@ function installMcp() {
 
   claudeJson.mcpServers["claude-buddy"] = {
     command: "bun",
-    args: [serverPath],
-    cwd: PROJECT_ROOT,
+    args: [toUnixPath(serverPath)],
+    cwd: toUnixPath(PROJECT_ROOT),
   };
 
   writeFileSync(claudeJsonPath, JSON.stringify(claudeJson, null, 2));
@@ -144,7 +153,7 @@ function installStatusLine(settings: Record<string, any>) {
 
   settings.statusLine = {
     type: "command",
-    command: statusScript,
+    command: toUnixPath(statusScript),
     padding: 1,
     refreshInterval: 1,  // 1 second — drives the buddy animation
   };
@@ -178,7 +187,7 @@ function installPopupHooks(settings: Record<string, any>) {
     (h: any) => !h.hooks?.some((hh: any) => hh.command?.includes("claude-buddy")),
   );
   settings.hooks.SessionStart.push({
-    hooks: [{ type: "command", command: `${popupManager} start` }],
+    hooks: [{ type: "command", command: `${toUnixPath(popupManager)} start` }],
   });
 
   // SessionEnd: close popup
@@ -187,7 +196,7 @@ function installPopupHooks(settings: Record<string, any>) {
     (h: any) => !h.hooks?.some((hh: any) => hh.command?.includes("claude-buddy")),
   );
   settings.hooks.SessionEnd.push({
-    hooks: [{ type: "command", command: `${popupManager} stop` }],
+    hooks: [{ type: "command", command: `${toUnixPath(popupManager)} stop` }],
   });
 
   ok("Popup hooks registered: SessionStart + SessionEnd");
@@ -209,7 +218,7 @@ function installHooks(settings: Record<string, any>) {
   );
   settings.hooks.PostToolUse.push({
     matcher: "Bash",
-    hooks: [{ type: "command", command: reactHook }],
+    hooks: [{ type: "command", command: toUnixPath(reactHook) }],
   });
 
   // Stop: extract <!-- buddy: --> comment from Claude's response
@@ -218,7 +227,7 @@ function installHooks(settings: Record<string, any>) {
     (h: any) => !h.hooks?.some((hh: any) => hh.command?.includes("claude-buddy")),
   );
   settings.hooks.Stop.push({
-    hooks: [{ type: "command", command: commentHook }],
+    hooks: [{ type: "command", command: toUnixPath(commentHook) }],
   });
 
   // UserPromptSubmit: detect buddy's name in user message → instant status line reaction
@@ -227,7 +236,7 @@ function installHooks(settings: Record<string, any>) {
     (h: any) => !h.hooks?.some((hh: any) => hh.command?.includes("claude-buddy")),
   );
   settings.hooks.UserPromptSubmit.push({
-    hooks: [{ type: "command", command: nameHook }],
+    hooks: [{ type: "command", command: toUnixPath(nameHook) }],
   });
 
   ok("Hooks registered: PostToolUse + Stop + UserPromptSubmit");
