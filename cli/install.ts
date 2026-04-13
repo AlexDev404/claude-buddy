@@ -11,6 +11,7 @@ import { join, resolve, dirname } from "path";
 import { homedir } from "os";
 
 import { generateBones, renderBuddy, renderFace, RARITY_STARS } from "../server/engine.ts";
+import { toUnixPath } from "../server/path.ts";
 import { loadCompanion, saveCompanion, resolveUserId, writeStatusState } from "../server/state.ts";
 import { generateFallbackName } from "../server/reactions.ts";
 
@@ -88,15 +89,6 @@ function preflight(): boolean {
   }
 
   return pass;
-}
-
-// Path normalization (Windows compat)
-// Node's path.join() produces backslash paths on Windows, which bash treats as
-// escape sequences, stripping them entirely (e.g. C:\Users -> C:Users).
-// Use forward slashes in all paths written to config files.
-
-function toUnixPath(p: string): string {
-  return p.replace(/\\/g, "/");
 }
 
 // ─── Load / update settings.json ────────────────────────────────────────────
