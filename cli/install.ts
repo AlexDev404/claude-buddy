@@ -65,7 +65,7 @@ function preflight(): boolean {
       execSync("sudo apt-get install -y jq 2>/dev/null || brew install jq 2>/dev/null", { stdio: "ignore" });
       ok("jq installed");
     } catch {
-      err("Could not install jq. Install manually: apt install jq / brew install jq");
+      err("Could not install jq. Install manually: apt install jq / brew install jq / windows: install from https://github.com/jqlang/jq/releases/latest and add to PATH");
       pass = false;
     }
   }
