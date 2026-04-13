@@ -145,6 +145,19 @@ export function saveCompanionSlot(companion: Companion, slot: string): void {
   saveManifest(m);
 }
 
+/**
+ * UPDATE an existing (possibly non-active) companion slot.
+ * Throws if the slot does not exist.
+ */
+export function updateCompanionSlot(slot: string, companion: Companion): void {
+  const m = loadManifest();
+  if (!m.companions[slot]) {
+    throw new Error(`Slot "${slot}" does not exist.`);
+  }
+  m.companions[slot] = companion;
+  saveManifest(m);
+}
+
 export function deleteCompanionSlot(slot: string): void {
   const m = loadManifest();
   delete m.companions[slot];

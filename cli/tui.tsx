@@ -21,7 +21,7 @@ import { homedir } from "node:os";
 import {
   listCompanionSlots, loadActiveSlot, saveActiveSlot,
   loadConfig, saveConfig, writeStatusState, loadReaction,
-  resolveUserId, saveCompanionSlot, slugify, unusedName,
+  resolveUserId, saveCompanionSlot, updateCompanionSlot, slugify, unusedName,
   type BuddyConfig,
 } from "../server/state.ts";
 import {
@@ -52,15 +52,102 @@ const PROJECT_ROOT = resolve(dirname(import.meta.dir));
 
 // ─── Sidebar ────────────────────────────────────────────────────────────────
 
-const SIDEBAR_ITEMS: { key: Section; icon: string; label: string }[] = [
-  { key: "menagerie", icon: "🏠", label: "Pets" },
-  { key: "settings", icon: "🔧", label: "Config" },
-  { key: "achievements", icon: "🏆", label: "Achievements" },
-  { key: "hunt", icon: "🎯", label: "Hunt" },
-  { key: "verify", icon: "🔍", label: "Verify" },
-  { key: "doctor", icon: "🩺", label: "Doctor" },
-  { key: "backup", icon: "💾", label: "Backup" },
-  { key: "system", icon: "🚨", label: "System" },
+interface SidebarItem {
+  key: Section; icon: string; label: string; description: string[];
+}
+
+const SIDEBAR_ITEMS: SidebarItem[] = [
+  {
+    key: "menagerie", icon: "🏠", label: "Pets",
+    description: [
+      "Browse and manage all your saved buddies.",
+      "",
+      "Filter by typing, navigate with arrows,",
+      "press Enter to summon a buddy as active.",
+      "",
+      "Use the \"Edit Personality\" button at the",
+      "bottom to rewrite a buddy's voice.",
+    ],
+  },
+  {
+    key: "settings", icon: "🔧", label: "Config",
+    description: [
+      "Configure the status line behaviour:",
+      "comment cooldown, reaction TTL, bubble",
+      "style/position, and rarity visibility.",
+      "",
+      "Changes are written to config.json and",
+      "take effect after restarting Claude Code.",
+    ],
+  },
+  {
+    key: "achievements", icon: "🏆", label: "Achievements",
+    description: [
+      "View all 16 milestone badges you can",
+      "unlock with your buddy — pets, coding",
+      "streaks, errors witnessed, and more.",
+      "",
+      "Locked badges show a progress bar;",
+      "3 secret ones stay hidden until earned.",
+    ],
+  },
+  {
+    key: "hunt", icon: "🎯", label: "Hunt",
+    description: [
+      "Brute-force search for a specific buddy.",
+      "",
+      "Choose species, rarity, shiny flag, peak",
+      "and dump stats — then start hunting.",
+      "",
+      "Legendary + shiny may take many minutes.",
+      "Pick from results, name and save.",
+    ],
+  },
+  {
+    key: "verify", icon: "🔍", label: "Verify",
+    description: [
+      "Show the deterministic buddy generated",
+      "from any user ID — useful for debugging",
+      "or exploring what IDs produce.",
+      "",
+      "Random / Current / Custom hex input.",
+    ],
+  },
+  {
+    key: "doctor", icon: "🩺", label: "Doctor",
+    description: [
+      "Run diagnostic checks on your install:",
+      "environment (bun, jq, claude CLI),",
+      "filesystem paths, MCP registration,",
+      "hooks, status line, and buddy state.",
+      "",
+      "Green = OK, yellow = warn, red = error.",
+    ],
+  },
+  {
+    key: "backup", icon: "💾", label: "Backup",
+    description: [
+      "Create and browse snapshots of your",
+      "claude-buddy state — settings, hooks,",
+      "skill, menagerie, status, and config.",
+      "",
+      "Restore is currently manual (copy from",
+      "~/.claude-buddy/backups/<ts>/ folders).",
+    ],
+  },
+  {
+    key: "system", icon: "🚨", label: "System",
+    description: [
+      "Manage claude-buddy's installation:",
+      "",
+      "• Re-Enable — runs install-buddy",
+      "• Disable  — keeps data, removes MCP",
+      "• Uninstall — destructive, requires",
+      "  typing UNINSTALL to confirm",
+      "",
+      "Auto-backup runs before any uninstall.",
+    ],
+  },
 ];
 
 function Sidebar({ cursor, section, focus }: {
@@ -105,22 +192,23 @@ function Sidebar({ cursor, section, focus }: {
 
 // ─── Middle: Buddy List ─────────────────────────────────────────────────────
 
-function BuddyListPane({ slots, cursor, activeSlot, focused, searchTerm, searching }: {
+function BuddyListPane({ slots, cursor, activeSlot, focused, searchTerm }: {
   slots: SlotEntry[]; cursor: number; activeSlot: string; focused: boolean;
-  searchTerm: string; searching: boolean;
+  searchTerm: string;
 }) {
+  const editIdx = slots.length;
+  const isEditCursor = focused && cursor === editIdx;
   return (
     <Box flexDirection="column" paddingX={1}>
       <Text bold color={focused ? "cyan" : "gray"}>{" 🏠 Menagerie"}</Text>
-      {(searchTerm || searching) ? (
-        <Box borderStyle={searching ? "round" as any : "single" as any} borderColor={searching ? "cyan" : "gray"} paddingX={1}>
-          <Text dimColor>/ </Text>
+      <Box borderStyle="single" borderColor="gray" paddingX={1}>
+        <Text dimColor>🔎 </Text>
+        {searchTerm ? (
           <Text bold color="yellow">{searchTerm}</Text>
-          {searching ? <Text color="yellow">▌</Text> : null}
-        </Box>
-      ) : (
-        <Text dimColor>{"  "}Press / to filter</Text>
-      )}
+        ) : (
+          <Text dimColor>filter by name, species, rarity…</Text>
+        )}
+      </Box>
       <Text>{""}</Text>
       {slots.length === 0 ? (
         <Text dimColor>{" "}No buddies match.</Text>
@@ -144,6 +232,20 @@ function BuddyListPane({ slots, cursor, activeSlot, focused, searchTerm, searchi
           );
         })
       )}
+      {slots.length > 0 ? (
+        <>
+          <Text>{""}</Text>
+          <Box
+            borderStyle={isEditCursor ? "round" as any : "single" as any}
+            borderColor={isEditCursor ? "magenta" : "gray"}
+            paddingX={1}
+          >
+            <Text bold={isEditCursor} color={isEditCursor ? "magenta" : "gray"}>
+              ✏  Edit Personality
+            </Text>
+          </Box>
+        </>
+      ) : null}
     </Box>
   );
 }
@@ -1148,8 +1250,10 @@ function HuntNamingPane({ nameInput, chosenBones }: {
 
 // ─── Right: Buddy Card ──────────────────────────────────────────────────────
 
-function BuddyCardPane({ companion, slot, isActive }: {
+function BuddyCardPane({ companion, slot, isActive, editablePersonality, editCursor = 0 }: {
   companion: Companion; slot: string; isActive: boolean;
+  editablePersonality?: string;
+  editCursor?: number;
 }) {
   const b = companion.bones;
   const color = RARITY_COLOR[b.rarity] ?? "white";
@@ -1159,6 +1263,9 @@ function BuddyCardPane({ companion, slot, isActive }: {
   const hatLine = HAT_ART[b.hat];
   if (hatLine && !art[0].trim()) art[0] = hatLine;
   const reaction = loadReaction();
+  const isEditing = typeof editablePersonality === "string";
+  const displayPersonality = isEditing ? editablePersonality! : companion.personality;
+  const overLimit = isEditing && (editablePersonality?.length ?? 0) > 500;
 
   const mkBar = (val: number) => {
     const f = Math.round(val / 10);
@@ -1184,10 +1291,26 @@ function BuddyCardPane({ companion, slot, isActive }: {
         <Text bold color={color}>{companion.name}</Text>
       </Box>
 
-      {/* Personality */}
-      <Box marginBottom={1}>
-        <Text dimColor italic>"{companion.personality}"</Text>
-      </Box>
+      {/* Personality — editable when editablePersonality provided */}
+      {isEditing ? (
+        <Box flexDirection="column" marginBottom={1}>
+          <Box borderStyle="round" borderColor={overLimit ? "red" : "magenta"} paddingX={1}>
+            <Text italic color={overLimit ? "red" : "yellow"}>
+              {displayPersonality.slice(0, editCursor)}
+              <Text color="yellow" inverse>{displayPersonality.slice(editCursor, editCursor + 1) || " "}</Text>
+              {displayPersonality.slice(editCursor + 1)}
+            </Text>
+          </Box>
+          <Text dimColor>
+            {displayPersonality.length} / 500
+            {overLimit ? " — over limit" : ""}  ⏎ save  esc cancel  ←→ move
+          </Text>
+        </Box>
+      ) : (
+        <Box marginBottom={1}>
+          <Text dimColor italic>"{companion.personality}"</Text>
+        </Box>
+      )}
 
       {/* Stats */}
       <Box flexDirection="column" marginBottom={1}>
@@ -1291,14 +1414,34 @@ function SettingDetailPane({ settingIndex, config, editing, numInput, optCursor 
   );
 }
 
-// ─── Right: Welcome ─────────────────────────────────────────────────────────
+// ─── Right: Sidebar Description ─────────────────────────────────────────────
 
-function WelcomePane() {
-  const slots = listCompanionSlots();
-  const activeSlot = loadActiveSlot();
-  const entry = slots.find(s => s.slot === activeSlot);
-  if (!entry) return <Box flexDirection="column" paddingLeft={1}><Text dimColor>No companion yet.</Text></Box>;
-  return <BuddyCardPane companion={entry.companion} slot={entry.slot} isActive={true} />;
+function SidebarDescriptionPane({ cursor }: { cursor: number }) {
+  if (cursor >= SIDEBAR_ITEMS.length) {
+    return (
+      <Box flexDirection="column" paddingLeft={2} paddingY={1}>
+        <Text bold color="red">👋 Exit</Text>
+        <Text>{""}</Text>
+        <Text dimColor>Close the dashboard and</Text>
+        <Text dimColor>return to your shell.</Text>
+      </Box>
+    );
+  }
+  const item = SIDEBAR_ITEMS[cursor];
+  if (!item) return null;
+  return (
+    <Box flexDirection="column" paddingLeft={2} paddingY={1}>
+      <Text bold color="cyan">{item.icon} {item.label}</Text>
+      <Text>{""}</Text>
+      {item.description.map((line, i) => (
+        <Text key={i} dimColor={line !== ""}>{line || " "}</Text>
+      ))}
+      <Text>{""}</Text>
+      <Text dimColor>{"─".repeat(30)}</Text>
+      <Text>{""}</Text>
+      <Text dimColor>Press ⏎ to open this section</Text>
+    </Box>
+  );
 }
 
 // ─── App ────────────────────────────────────────────────────────────────────
@@ -1329,9 +1472,17 @@ function App() {
     [achData.unlocked],
   );
 
-  // Menagerie search/filter
+  // Menagerie search/filter (always-active text input)
   const [menagSearch, setMenagSearch] = useState("");
-  const [menagSearching, setMenagSearching] = useState(false);
+
+  // Menagerie personality editor
+  // input + cursor live in one object so rapid key-repeat (held backspace,
+  // held arrows) can update both atomically via a single functional setter.
+  const [personalityEditing, setPersonalityEditing] = useState(false);
+  const [personalitySlot, setPersonalitySlot] = useState("");
+  const [personalityEdit, setPersonalityEdit] = useState<{ input: string; cursor: number }>({ input: "", cursor: 0 });
+  const personalityInput = personalityEdit.input;
+  const personalityCursor = personalityEdit.cursor;
 
   // Verify
   const [verifyInput, setVerifyInput] = useState("");
@@ -1436,6 +1587,10 @@ function App() {
         setListCursor(0);
         setSettCursor(0);
         setSystemCursor(0);
+        setMenagSearch("");
+        setPersonalityEditing(false);
+        setPersonalitySlot("");
+        setPersonalityEdit({ input: "", cursor: 0 });
         setDisableConfirming(false);
         setDisableResult(null);
         setEnableResult(null);
@@ -1445,27 +1600,136 @@ function App() {
       }
     }
 
-    // ─── List: Menagerie ────────────────────
-    else if (focus === "list" && section === "menagerie") {
-      if (menagSearching) {
-        if (key.escape) { setMenagSearch(""); setMenagSearching(false); setListCursor(0); return; }
-        if (key.return) { setMenagSearching(false); setListCursor(0); return; }
-        if (key.backspace || key.delete) { setMenagSearch(s => s.slice(0, -1)); return; }
-        if (input && input.length === 1 && input >= " " && input !== "/") {
-          setMenagSearch(s => s + input);
+    // ─── Personality Edit ───────────────────
+    // Enter = save, Esc = discard + exit, ↑↓ = switch buddy (discards unsaved),
+    // ←→ = move cursor within the text.
+    else if (focus === "list" && section === "menagerie" && personalityEditing) {
+      if (key.escape) {
+        setPersonalityEditing(false);
+        setPersonalitySlot("");
+        setPersonalityEdit({ input: "", cursor: 0 });
+        return;
+      }
+
+      if (key.return) {
+        if (personalityInput.length === 0 || personalityInput.length > 500) {
+          setMessage("✗ personality must be 1-500 chars");
+          return;
+        }
+        const entry = rawSlots.find(s => s.slot === personalitySlot);
+        if (!entry) return;
+        if (entry.companion.personality === personalityInput) {
+          setMessage("(no changes)");
+          return;
+        }
+        try {
+          updateCompanionSlot(personalitySlot, { ...entry.companion, personality: personalityInput });
+          setMessage(`✓ ${entry.companion.name}'s personality saved`);
+        } catch (e: any) {
+          setMessage(`✗ ${e?.message ?? "failed"}`);
         }
         return;
       }
-      if (key.escape) setFocus("sidebar");
-      if (input === "q") exit();
-      if (input === "/") { setMenagSearching(true); setMenagSearch(""); return; }
-      if (key.upArrow) setListCursor(c => Math.max(0, c - 1));
-      if (key.downArrow) setListCursor(c => Math.min(slots.length - 1, c + 1));
-      if (isSelect && slots[listCursor]) {
-        const { slot, companion } = slots[listCursor];
-        saveActiveSlot(slot);
-        writeStatusState(companion, `*${companion.name} arrives*`);
-        setMessage(`✓ ${companion.name} is now active!`);
+
+      if (key.leftArrow) {
+        setPersonalityEdit(st => ({ input: st.input, cursor: Math.max(0, st.cursor - 1) }));
+        return;
+      }
+      if (key.rightArrow) {
+        setPersonalityEdit(st => ({ input: st.input, cursor: Math.min(st.input.length, st.cursor + 1) }));
+        return;
+      }
+
+      if (key.upArrow || key.downArrow) {
+        // Switch buddy — discards unsaved changes of current buddy
+        const maxIdx = slots.length - 1;
+        const newIdx = key.upArrow
+          ? Math.max(0, listCursor - 1)
+          : Math.min(maxIdx, listCursor + 1);
+        setListCursor(newIdx);
+        const nextBuddy = slots[newIdx];
+        if (nextBuddy) {
+          setPersonalitySlot(nextBuddy.slot);
+          setPersonalityEdit({ input: nextBuddy.companion.personality, cursor: nextBuddy.companion.personality.length });
+        }
+        return;
+      }
+
+      if (key.backspace || key.delete) {
+        setPersonalityEdit(st => {
+          if (st.cursor === 0) return st;
+          return {
+            input: st.input.slice(0, st.cursor - 1) + st.input.slice(st.cursor),
+            cursor: st.cursor - 1,
+          };
+        });
+        return;
+      }
+
+      // Insert printable chars (handles typed input and paste).
+      // Strip bracketed-paste markers and any control characters.
+      if (input && input.length > 0) {
+        const cleaned = input
+          .replace(/\x1b\[200~|\x1b\[201~/g, "")
+          .replace(/[\x00-\x1f\x7f]/g, "");
+        if (cleaned.length > 0) {
+          setPersonalityEdit(st => {
+            const remaining = Math.max(0, 500 - st.input.length);
+            const toInsert = cleaned.slice(0, remaining);
+            if (toInsert.length === 0) return st;
+            return {
+              input: st.input.slice(0, st.cursor) + toInsert + st.input.slice(st.cursor),
+              cursor: st.cursor + toInsert.length,
+            };
+          });
+        }
+      }
+      return;
+    }
+
+    // ─── List: Menagerie ────────────────────
+    // Filter is always active while in list mode: typing filters live,
+    // arrows navigate (incl. the "Edit Personality" button at the end),
+    // Enter activates buddy or opens edit mode.
+    else if (focus === "list" && section === "menagerie") {
+      const editIdx = slots.length; // cursor position for the edit button
+      if (key.escape) {
+        if (menagSearch) { setMenagSearch(""); setListCursor(0); return; }
+        setFocus("sidebar");
+        return;
+      }
+      if (key.upArrow) { setListCursor(c => Math.max(0, c - 1)); return; }
+      if (key.downArrow) { setListCursor(c => Math.min(editIdx, c + 1)); return; }
+      if (key.return) {
+        if (listCursor === editIdx) {
+          // Edit Personality button — use buddy just above the button
+          const buddyIdx = Math.min(Math.max(0, listCursor - 1), slots.length - 1);
+          const target = slots[buddyIdx];
+          if (target) {
+            setListCursor(buddyIdx); // move cursor back onto that buddy
+            setPersonalitySlot(target.slot);
+            setPersonalityEdit({ input: target.companion.personality, cursor: target.companion.personality.length });
+            setPersonalityEditing(true);
+          }
+          return;
+        }
+        if (slots[listCursor]) {
+          const { slot, companion } = slots[listCursor];
+          saveActiveSlot(slot);
+          writeStatusState(companion, `*${companion.name} arrives*`);
+          setMessage(`✓ ${companion.name} is now active!`);
+        }
+        return;
+      }
+      if (key.backspace || key.delete) {
+        setMenagSearch(s => s.slice(0, -1));
+        setListCursor(0);
+        return;
+      }
+      // Any printable char → append to filter (reset cursor to top)
+      if (input && input.length === 1 && input >= " " && input !== "\x7f") {
+        setMenagSearch(s => s + input);
+        setListCursor(0);
       }
     }
 
@@ -1769,10 +2033,27 @@ function App() {
 
   if (showContent) {
     if (section === "menagerie") {
-      middlePane = <BuddyListPane slots={slots} cursor={listCursor} activeSlot={activeSlot} focused={focus === "list"} searchTerm={menagSearch} searching={menagSearching} />;
-      if (slots[listCursor]) {
-        const { slot, companion } = slots[listCursor];
-        rightPane = <BuddyCardPane companion={companion} slot={slot} isActive={slot === activeSlot} />;
+      middlePane = <BuddyListPane slots={slots} cursor={listCursor} activeSlot={activeSlot} focused={focus === "list"} searchTerm={menagSearch} />;
+      if (personalityEditing) {
+        // Editing: the right-pane card follows the cursor (slots[listCursor]),
+        // and shows editablePersonality so typing updates live.
+        const entry = slots[listCursor];
+        if (entry) {
+          rightPane = <BuddyCardPane
+            companion={entry.companion}
+            slot={entry.slot}
+            isActive={entry.slot === activeSlot}
+            editablePersonality={personalityInput}
+            editCursor={personalityCursor}
+          />;
+        }
+      } else {
+        // Normal preview: cursor on edit button → show buddy above it
+        const previewIdx = listCursor < slots.length ? listCursor : Math.max(0, slots.length - 1);
+        if (slots[previewIdx]) {
+          const { slot, companion } = slots[previewIdx];
+          rightPane = <BuddyCardPane companion={companion} slot={slot} isActive={slot === activeSlot} />;
+        }
       }
     } else if (section === "settings") {
       middlePane = <SettingsListPane cursor={settCursor} config={config} focused={focus === "list"} />;
@@ -1856,7 +2137,11 @@ function App() {
     focus === "edit" ? (SETTING_DEFS[settCursor]?.type === "options"
       ? "↑↓ navigate  ⏎/␣ confirm  esc back"
       : "type number  ⏎ confirm  esc back") :
-    section === "menagerie" ? (menagSearching ? "type to filter  ⏎ confirm  esc cancel" : "↑↓ nav  ⏎ summon  / filter  esc back  q quit") :
+    section === "menagerie" ? (
+      personalityEditing
+        ? "type edit  ←→ cursor  ↑↓ switch buddy  ⏎ save  esc discard+exit"
+        : "type to filter  ↑↓ nav  ⏎ summon/edit  esc clear/back"
+    ) :
     section === "achievements" ? "↑↓ navigate  esc back  q quit" :
     section === "verify" ? (verifyEditing ? "type hex  ⏎ generate  esc cancel" : "↑↓ nav  ⏎ activate  esc back") :
     section === "hunt" ? (
@@ -1896,7 +2181,7 @@ function App() {
           </>
         ) : (
           <Box flexGrow={1} flexDirection="column" borderStyle="single" borderColor="gray">
-            <WelcomePane />
+            <SidebarDescriptionPane cursor={sidebarCursor} />
           </Box>
         )}
       </Box>
