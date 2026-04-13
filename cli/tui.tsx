@@ -1802,15 +1802,29 @@ function App() {
         rightPane = null;
       }
     } else if (section === "hunt") {
-      middlePane = <HuntFormPane criteria={huntCriteria} fieldCursor={huntFieldCursor} optCursors={huntOptCursors} focused={focus === "list" && huntPhase === "form"} />;
-      if (huntPhase === "searching") {
-        rightPane = <HuntProgressPane checked={huntChecked} maxAttempts={huntMaxAttempts(huntCriteria.rarity, huntCriteria.shiny)} found={huntResults.length} />;
+      if (huntPhase === "form" || huntPhase === "searching") {
+        middlePane = <HuntFormPane criteria={huntCriteria} fieldCursor={huntFieldCursor} optCursors={huntOptCursors} focused={focus === "list" && huntPhase === "form"} />;
+        rightPane = huntPhase === "searching"
+          ? <HuntProgressPane checked={huntChecked} maxAttempts={huntMaxAttempts(huntCriteria.rarity, huntCriteria.shiny)} found={huntResults.length} />
+          : null;
       } else if (huntPhase === "results") {
-        rightPane = <HuntResultsPane results={huntResults} cursor={huntResultCursor} focused={focus === "list"} />;
+        middlePane = <HuntResultsPane results={huntResults} cursor={huntResultCursor} focused={focus === "list"} />;
+        const selected = huntResults[huntResultCursor];
+        if (selected) {
+          const synthetic: Companion = {
+            bones: selected.bones,
+            name: "(unnamed)",
+            personality: `A ${selected.bones.rarity} ${selected.bones.species} waiting for a name.`,
+            hatchedAt: Date.now(),
+            userId: selected.userId,
+          };
+          rightPane = <BuddyCardPane companion={synthetic} slot={selected.userId.slice(0, 8)} isActive={false} />;
+        } else {
+          rightPane = null;
+        }
       } else if (huntPhase === "naming") {
+        middlePane = <HuntResultsPane results={huntResults} cursor={huntResultCursor} focused={false} />;
         rightPane = <HuntNamingPane nameInput={huntNameInput} chosenBones={huntResults[huntResultCursor].bones} />;
-      } else {
-        rightPane = null;
       }
     } else if (section === "doctor") {
       middlePane = <DoctorListPane categories={diagData} cursor={listCursor} focused={focus === "list"} />;
