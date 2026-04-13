@@ -16,5 +16,5 @@
     "moduleDetection": "force",
     "jsx": "react-jsx"
   },
-  "include": ["server/**/*.ts", "cli/**/*.ts"]
+  "include": ["server/**/*.ts", "cli/**/*.ts", "cli/**/*.tsx"]
 }
